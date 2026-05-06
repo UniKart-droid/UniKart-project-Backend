@@ -162,7 +162,6 @@ export const signupUser = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Signup successful. Wait for admin approval",
-      //  Added isApproved here
       user: { id: newUser._id, name: newUser.name, role: newUser.role, isApproved: newUser.isApproved }
     });
 
@@ -200,7 +199,6 @@ export const loginUser = async (req, res) => {
     res.status(200).json({
       success: true,
       token,
-      //  Added isApproved here for Frontend Navbar Logic
       user: { id: user._id, name: user.name, role: user.role, isApproved: user.isApproved }
     });
   } catch (error) {
@@ -275,5 +273,62 @@ export const resetPassword = async (req, res) => {
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ==========================================
+//  ADMIN: DASHBOARD CONTROLLERS
+// ==========================================
+
+// 1. Fetch Approved Students for Dashboard
+export const getApprovedStudents = async (req, res) => {
+  try {
+    const students = await User.find({ role: "student", isApproved: true });
+    res.status(200).json({ success: true, students });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching approved students", error: error.message });
+  }
+};
+
+// 2. Reject/Remove User (PATCH) - Using findByIdAndDelete to fully remove if needed
+export const rejectUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({ success: true, message: "User removed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error rejecting user", error: error.message });
+  }
+};
+
+// 3. GET SINGLE USER (For "View" button)
+export const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password -otp");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user details", error: error.message });
+  }
+};
+
+// 4. UPDATE USER (For "Edit" button)
+export const updateUser = async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+
+    res.status(200).json({ success: true, message: "User updated successfully", user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating user", error: error.message });
   }
 };

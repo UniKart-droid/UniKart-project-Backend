@@ -78,46 +78,34 @@ const getConsistentChatId = (id1, id2) => {
     SOCKET CONNECTION
 ---------------------------- */
 io.on("connection", (socket) => {
-  console.log(" User connected:", socket.id);
 
   /* JOIN CHAT ROOM */
   socket.on("join_chat", (chatId) => {
-    if (!chatId) {
-      console.log(" join_chat: chatId missing");
-      return;
-    }
+    if (!chatId) return;
     socket.join(chatId);
-    console.log(` USER JOINED ROOM: ${chatId}`);
   });
 
   /* SEND MESSAGE */
   socket.on("send_message", async (data) => {
     try {
-      console.log(" SOCKET DATA RECEIVED:", data);
-
       const { sender, receiver, message, chatId } = data;
 
       // Consistent ID generator logic
       const finalChatId = chatId || getConsistentChatId(sender, receiver);
 
-      /* 🔥 VALIDATION */
-      if (!finalChatId || !sender || !receiver || !message) {
-        console.log(" Invalid message data:", { finalChatId, sender, receiver, message });
-        return;
-      }
+      /* VALIDATION */
+      if (!finalChatId || !sender || !receiver || !message) return;
 
-      /* 🔥 ENSURE CHAT EXISTS */
+      /* ENSURE CHAT EXISTS */
       let chat = await Chat.findOne({ chatId: finalChatId });
 
       if (!chat) {
-        console.log("⚠️ Chat not found, creating new one");
         chat = await Chat.create({
           chatId: finalChatId,
           members: [sender, receiver],
           lastMessage: message,
         });
       }
-
 
       const savedMessage = await Message.create({
         chatId: finalChatId,
@@ -126,9 +114,7 @@ io.on("connection", (socket) => {
         text: message, 
       });
 
-      console.log(" MESSAGE SAVED:", savedMessage._id);
-
-      /*  UPDATE CHAT COLLECTION */
+      /* UPDATE CHAT COLLECTION */
       chat.lastMessage = message;
       chat.updatedAt = Date.now();
       await chat.save();
@@ -142,15 +128,13 @@ io.on("connection", (socket) => {
         createdAt: savedMessage.createdAt,
       });
 
-      console.log(" MESSAGE EMITTED TO ROOM:", finalChatId);
-
     } catch (error) {
-      console.error(" Socket Error in send_message:", error);
+      // Logic unchanged, only logs removed
     }
   });
 
   socket.on("disconnect", () => {
-    console.log(" User disconnected:", socket.id);
+    // Silent disconnect
   });
 });
 
@@ -162,13 +146,12 @@ const PORT = process.env.PORT || 8000;
 const start = async () => {
   try {
     await connectDB();
-    console.log(" MongoDB Connected successfully");
-
+    
     server.listen(PORT, () => {
+      // Server starting message can be kept for basic monitoring
       console.log(` Server running on port: ${PORT}`);
     });
   } catch (error) {
-    console.error(" Server start error:", error);
     process.exit(1);
   }
 };

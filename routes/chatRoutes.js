@@ -136,7 +136,7 @@ router.get("/user/:id", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ User fetch error:", error);
+    console.error(" User fetch error:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching user details"
@@ -163,7 +163,7 @@ router.get("/messages/:chatId", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Fetch messages error:", error);
+    console.error(" Fetch messages error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to retrieve chat history",
@@ -217,7 +217,7 @@ router.get("/user-chats/:userId", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Fetch user-chats error:", error);
+    console.error(" Fetch user-chats error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error while fetching chats"
