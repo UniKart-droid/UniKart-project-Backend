@@ -5,7 +5,6 @@ import {
   forgotPassword,
   resetPassword,
   sendOtp,
-  // Naye functions jo controllers mein add kiye gaye hain
   getUserById,
   updateUser
 } from "../controllers/userController.js";
@@ -103,11 +102,8 @@ router.patch("/approve-user/:id", async (req, res) => {
   }
 });
 
-/**
- * REJECT USER FIX: 
- * Frontend axios.patch use kar raha hai.
- */
-router.patch("/reject-user/:id", async (req, res) => {
+
+router.delete("/reject-user/:id", async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) {
@@ -157,10 +153,9 @@ router.get("/approved-teachers", async (req, res) => {
 //  NEW: VIEW & EDIT ROUTES (FOR DASHBOARD)
 // ==========================================
 
-// Teacher ya Student ki details dekhne ke liye (View Button)
+
 router.get("/user/:id", getUserById);
 
-// Teacher ya Student ka data update karne ke liye (Edit Button)
 router.put("/update-user/:id", updateUser);
 
 export default router;
