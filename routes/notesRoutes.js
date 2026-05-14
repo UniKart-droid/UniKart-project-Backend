@@ -6,9 +6,9 @@ import { verifyToken, checkApprovedUser } from "../middleware/authMiddleware.js"
 
 const router = express.Router();
 
-// ==========================
+//
 //  MULTER CONFIG 
-// ==========================
+// 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/"); 
