@@ -1,7 +1,8 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
+
+import express from "express";
+import cors from "cors";
 import connectDB from "./config/db/connect.js";
 
 import router from "./routes/userRoutes.js";
@@ -57,11 +58,11 @@ app.get("/api/health", (req, res) => {
 const server = http.createServer(app);
 
 /* ---------------------------
-    SOCKET SETUP
+    SOCKET SETUP (FIXED)
 ---------------------------- */
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", 
+    origin: process.env.FRONTEND_URL,
     methods: ["GET", "POST"],
   },
 });
@@ -79,24 +80,19 @@ const getConsistentChatId = (id1, id2) => {
 ---------------------------- */
 io.on("connection", (socket) => {
 
-  /* JOIN CHAT ROOM */
   socket.on("join_chat", (chatId) => {
     if (!chatId) return;
     socket.join(chatId);
   });
 
-  /* SEND MESSAGE */
   socket.on("send_message", async (data) => {
     try {
       const { sender, receiver, message, chatId } = data;
 
-      // Consistent ID generator logic
       const finalChatId = chatId || getConsistentChatId(sender, receiver);
 
-      /* VALIDATION */
       if (!finalChatId || !sender || !receiver || !message) return;
 
-      /* ENSURE CHAT EXISTS */
       let chat = await Chat.findOne({ chatId: finalChatId });
 
       if (!chat) {
@@ -111,10 +107,9 @@ io.on("connection", (socket) => {
         chatId: finalChatId,
         sender,
         receiver,
-        text: message, 
+        text: message,
       });
 
-      /* UPDATE CHAT COLLECTION */
       chat.lastMessage = message;
       chat.updatedAt = Date.now();
       await chat.save();
@@ -124,35 +119,38 @@ io.on("connection", (socket) => {
         chatId: finalChatId,
         sender: savedMessage.sender,
         receiver: savedMessage.receiver,
-        text: savedMessage.text, 
+        text: savedMessage.text,
         createdAt: savedMessage.createdAt,
       });
 
     } catch (error) {
-      // Logic unchanged, only logs removed
+      console.error("Socket Error:", error.message);
     }
   });
 
   socket.on("disconnect", () => {
-    // Silent disconnect
+    // silent
   });
 });
 
 /* ---------------------------
-    START SERVER
+    START SERVER (FIXED)
 ---------------------------- */
 const PORT = process.env.PORT || 8000;
 
 const start = async () => {
   try {
+    console.log("Starting server...");
+
     await connectDB();
-    
+    console.log("MongoDB connected");
+
     server.listen(PORT, () => {
-      // Server starting message can be kept for basic monitoring
-      console.log(` Server running on port: ${PORT}`);
+      console.log(`Server running on port: ${PORT}`);
     });
+
   } catch (error) {
-    process.exit(1);
+    console.error("Startup Error:", error);
   }
 };
 
