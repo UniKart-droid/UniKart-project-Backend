@@ -6,10 +6,10 @@
   "author": "Himanshi",
   "type": "module",
   "main": "app.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon app.js"
-  },
+ "scripts": {
+  "test": "echo \"Error: no test specified\" && exit 1",
+  "start": "node app.js"
+},
   "dependencies": {
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
