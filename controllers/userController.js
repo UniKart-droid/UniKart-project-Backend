@@ -2,28 +2,35 @@ import User from "../model/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import * as Brevo from "@getbrevo/brevo"; // FIXED
+import * as Brevo from "@getbrevo/brevo"; // keep this
+
+// ==========================
+// BREVO CLIENT (FIXED)
+// ==========================
+const brevoClient = new Brevo.TransactionalEmailsApi();
+
+// IMPORTANT: correct auth method
+brevoClient.setApiKey(
+  Brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
 
 // ==========================
 // HELPER: SEND EMAIL
 // ==========================
 const sendEmail = async (to, subject, html) => {
   try {
-    const apiInstance = new Brevo.TransactionalEmailsApi();
-
-    apiInstance.setApiKey(
-      Brevo.TransactionalEmailsApiApiKeys.apiKey,
-      process.env.BREVO_API_KEY
-    );
-
     const sendSmtpEmail = {
-      sender: { email: "rajputridhi92@gmail.com", name: "UniKart" },
+      sender: {
+        email: "rajputridhi92@gmail.com",
+        name: "UniKart",
+      },
       to: [{ email: to }],
       subject,
       htmlContent: html,
     };
 
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
+    await brevoClient.sendTransacEmail(sendSmtpEmail);
   } catch (err) {
     console.log("EMAIL ERROR:", err.response?.body || err.message);
   }
@@ -35,11 +42,15 @@ const sendEmail = async (to, subject, html) => {
 export const sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!email)
+      return res.status(400).json({ message: "Email is required" });
 
     const existingUser = await User.findOne({ email });
+
     if (existingUser && existingUser.password) {
-      return res.status(400).json({ message: "User already exists with this email" });
+      return res
+        .status(400)
+        .json({ message: "User already exists with this email" });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -48,7 +59,7 @@ export const sendOtp = async (req, res) => {
     await User.findOneAndUpdate(
       { email },
       { otp, otpExpire, name: existingUser?.name || "TempUser" },
-      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+      { upsert: true, new: true }
     );
 
     await sendEmail(
@@ -61,10 +72,16 @@ export const sendOtp = async (req, res) => {
       </div>`
     );
 
-    res.status(200).json({ success: true, message: "OTP sent to your email" });
+    res.status(200).json({
+      success: true,
+      message: "OTP sent to your email",
+    });
   } catch (error) {
     console.error("SEND OTP ERROR:", error);
-    res.status(500).json({ success: false, message: "Error sending OTP" });
+    res.status(500).json({
+      success: false,
+      message: "Error sending OTP",
+    });
   }
 };
 
@@ -91,20 +108,44 @@ const sendWelcomeEmail = async (email, name) => {
 // ==========================
 export const signupUser = async (req, res) => {
   try {
-    const { name, email, password, confirm_password, sel_role, teacher_id, admin_id, otp } = req.body;
+    const {
+      name,
+      email,
+      password,
+      confirm_password,
+      sel_role,
+      teacher_id,
+      admin_id,
+      otp,
+    } = req.body;
 
-    if (!name || !email || !password || !confirm_password || !sel_role || !otp) {
-      return res.status(400).json({ message: "All required fields must be filled" });
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !confirm_password ||
+      !sel_role ||
+      !otp
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be filled" });
     }
 
     const userWithOtp = await User.findOne({ email });
 
-    if (!userWithOtp || userWithOtp.otp !== otp || userWithOtp.otpExpire < Date.now()) {
+    if (
+      !userWithOtp ||
+      userWithOtp.otp !== otp ||
+      userWithOtp.otpExpire < Date.now()
+    ) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
     if (password !== confirm_password) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res
+        .status(400)
+        .json({ message: "Passwords do not match" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -118,17 +159,27 @@ export const signupUser = async (req, res) => {
     };
 
     if (sel_role === "teacher") {
-      if (!teacher_id) return res.status(400).json({ message: "Teacher ID is required" });
+      if (!teacher_id)
+        return res
+          .status(400)
+          .json({ message: "Teacher ID is required" });
       updateFields.teacher_id = teacher_id;
     }
 
     if (sel_role === "admin") {
-      if (!admin_id) return res.status(400).json({ message: "Admin ID is required" });
+      if (!admin_id)
+        return res
+          .status(400)
+          .json({ message: "Admin ID is required" });
       updateFields.admin_id = admin_id;
     }
 
     if (sel_role === "student") {
-      if (!req.file) return res.status(400).json({ message: "ID Card is required" });
+      if (!req.file)
+        return res
+          .status(400)
+          .json({ message: "ID Card is required" });
+
       updateFields.id_card = req.file.path.replace(/\\/g, "/");
     }
 
@@ -138,7 +189,8 @@ export const signupUser = async (req, res) => {
       { new: true }
     );
 
-    if (!newUser) return res.status(400).json({ message: "Signup failed." });
+    if (!newUser)
+      return res.status(400).json({ message: "Signup failed." });
 
     sendWelcomeEmail(newUser.email, newUser.name);
 
@@ -152,10 +204,12 @@ export const signupUser = async (req, res) => {
         isApproved: newUser.isApproved,
       },
     });
-
   } catch (error) {
     console.error("SIGNUP ERROR:", error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
@@ -167,13 +221,17 @@ export const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found" });
+    if (!user)
+      return res.status(400).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.isApproved) {
-      return res.status(403).json({ message: "Pending admin approval" });
+      return res
+        .status(403)
+        .json({ message: "Pending admin approval" });
     }
 
     const token = jwt.sign(
@@ -185,9 +243,12 @@ export const loginUser = async (req, res) => {
     res.status(200).json({
       success: true,
       token,
-      user: { id: user._id, name: user.name, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+      },
     });
-
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -201,12 +262,14 @@ export const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
 
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
     await user.save();
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
@@ -218,7 +281,6 @@ export const forgotPassword = async (req, res) => {
     );
 
     res.status(200).json({ message: "Reset link sent" });
-
   } catch (error) {
     res.status(500).json({ message: "Error sending email" });
   }
@@ -236,7 +298,8 @@ export const resetPassword = async (req, res) => {
       resetPasswordExpire: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid token" });
+    if (!user)
+      return res.status(400).json({ message: "Invalid token" });
 
     user.password = await bcrypt.hash(req.body.password, 10);
     user.resetPasswordToken = undefined;
@@ -245,7 +308,6 @@ export const resetPassword = async (req, res) => {
     await user.save();
 
     res.status(200).json({ message: "Password updated" });
-
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -255,7 +317,10 @@ export const resetPassword = async (req, res) => {
 // ADMIN CONTROLLERS
 // ==========================
 export const getApprovedStudents = async (req, res) => {
-  const students = await User.find({ role: "student", isApproved: true });
+  const students = await User.find({
+    role: "student",
+    isApproved: true,
+  });
   res.json({ students });
 };
 
