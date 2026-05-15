@@ -2,7 +2,7 @@ import User from "../model/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import * as SibApiV3Sdk from "@getbrevo/brevo";
+import SibApiV3Sdk from "@getbrevo/brevo";
 
 // ==========================
 //  HELPER: SEND EMAIL
