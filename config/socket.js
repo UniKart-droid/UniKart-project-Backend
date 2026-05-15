@@ -6,7 +6,7 @@ let io;
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: "https://uni-kart-project.vercel.app", 
+      origin: "https://uni-kart-project.vercel.app",  
       methods: ["GET", "POST"],
     },
   });
