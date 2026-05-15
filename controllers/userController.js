@@ -2,21 +2,29 @@ import User from "../model/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import SibApiV3Sdk from "@getbrevo/brevo";
+import * as Brevo from "@getbrevo/brevo";   // ✅ FIXED IMPORT
 
 // ==========================
 //  HELPER: SEND EMAIL
 // ==========================
 const sendEmail = async (to, subject, html) => {
-  const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  apiInstance.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+  try {
+    const apiInstance = new Brevo.TransactionalEmailsApi();
 
-  await apiInstance.sendTransacEmail({
-    sender: { email: "rajputridhi92@gmail.com", name: "UniKart" },
-    to: [{ email: to }],
-    subject: subject,
-    htmlContent: html,
-  });
+    apiInstance.setApiKey(
+      Brevo.TransactionalEmailsApiApiKeys.apiKey,
+      process.env.BREVO_API_KEY
+    );
+
+    await apiInstance.sendTransacEmail({
+      sender: { email: "rajputridhi92@gmail.com", name: "UniKart" },
+      to: [{ email: to }],
+      subject: subject,
+      htmlContent: html,
+    });
+  } catch (err) {
+    console.log("EMAIL ERROR:", err.message);
+  }
 };
 
 // ==========================
@@ -38,24 +46,23 @@ export const sendOtp = async (req, res) => {
     await User.findOneAndUpdate(
       { email },
       { otp, otpExpire, name: existingUser?.name || "TempUser" },
-      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
 
     await sendEmail(
       email,
       "Your UniKart Verification Code",
-      `<div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
-        <h2 style="color: #333;">UniKart Verification</h2>
-        <p>Your OTP for registration is:</p>
-        <h1 style="color: #1f2937; letter-spacing: 5px;">${otp}</h1>
-        <p>This code is valid for <b>5 minutes</b>.</p>
+      `<div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>UniKart Verification</h2>
+        <h1>${otp}</h1>
+        <p>Valid for 5 minutes</p>
       </div>`
     );
 
     res.status(200).json({ success: true, message: "OTP sent to your email" });
   } catch (error) {
-    console.error(" SEND OTP ERROR:", error);
-    res.status(500).json({ success: false, message: "Error sending OTP", error: error.message });
+    console.error("SEND OTP ERROR:", error);
+    res.status(500).json({ success: false, message: "Error sending OTP" });
   }
 };
 
@@ -66,31 +73,14 @@ const sendWelcomeEmail = async (email, name) => {
   try {
     await sendEmail(
       email,
-      "Welcome to UniKart | Your Account is Ready",
-      `<div style="font-family: Arial, sans-serif; background-color:#f4f4f4; padding:20px;">
-        <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:10px; overflow:hidden;">
-          <div style="background:#1f2937; padding:20px; text-align:center;">
-            <h1 style="color:#ffffff; margin:0;">UniKart</h1>
-            <p style="color:#d1d5db;">Smart Learning Platform</p>
-          </div>
-          <div style="padding:30px; color:#333;">
-            <h2>Hello ${name},</h2>
-            <p>Welcome to <b>UniKart</b>! We're excited to have you on board.</p>
-            <p>Your account has been created successfully and is pending admin approval.</p>
-            <div style="margin:20px 0; padding:15px; background:#f3f4f6; border-left:4px solid #1f2937;">
-              <p><b>Email:</b> ${email}</p>
-            </div>
-            <a href="${process.env.FRONTEND_URL}/login"
-               style="display:inline-block;margin-top:20px;padding:12px 20px;
-               background:#1f2937;color:#fff;text-decoration:none;border-radius:5px;">
-               Go to Login
-            </a>
-          </div>
-        </div>
+      "Welcome to UniKart",
+      `<div>
+        <h2>Hello ${name}</h2>
+        <p>Welcome to UniKart!</p>
       </div>`
     );
   } catch (error) {
-    console.log(" Welcome Email failed:", error.message);
+    console.log("Welcome Email failed:", error.message);
   }
 };
 
@@ -148,22 +138,25 @@ export const signupUser = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Signup successful. Wait for admin approval",
-      user: { id: newUser._id, name: newUser.name, role: newUser.role, isApproved: newUser.isApproved }
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        role: newUser.role,
+        isApproved: newUser.isApproved,
+      },
     });
-
   } catch (error) {
-    console.error("🔥 SIGNUP ERROR:", error);
+    console.error("SIGNUP ERROR:", error);
     return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 // ==========================
-//  LOGIN CONTROLLER
+// LOGIN CONTROLLER
 // ==========================
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: "Email and password required" });
 
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "User not found" });
@@ -172,136 +165,104 @@ export const loginUser = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.isApproved) {
-      return res.status(403).json({ message: "Your account is pending admin approval" });
+      return res.status(403).json({ message: "Pending admin approval" });
     }
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || "fallback_secret",
+      process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     res.status(200).json({
       success: true,
       token,
-      user: { id: user._id, name: user.name, role: user.role, isApproved: user.isApproved }
+      user: { id: user._id, name: user.name, role: user.role },
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 // ==========================
-//  FORGOT & RESET PASSWORD
+// FORGOT PASSWORD
 // ==========================
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
+
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     await sendEmail(
-      user.email,
-      "Reset Your UniKart Password",
-      `<div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-        <h2 style="color: #333;">Password Reset Request</h2>
-        <p>Hello ${user.name},</p>
-        <p>You requested a password reset. Please click the button below to set a new password:</p>
-        <a href="${resetUrl}"
-           style="display: inline-block; padding: 12px 25px; background-color: #1f2937; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 10px 0;">
-           Reset Password
-        </a>
-        <p style="margin-top: 20px; font-size: 12px; color: #666;">
-          If the button doesn't work, copy and paste this link into your browser:<br>
-          <span style="color: #2563eb;">${resetUrl}</span>
-        </p>
-        <p>This link is valid for 10 minutes.</p>
-      </div>`
+      email,
+      "Reset Password",
+      `<a href="${resetUrl}">Reset Password</a>`
     );
 
-    res.status(200).json({ message: "Reset link sent to email" });
+    res.status(200).json({ message: "Reset link sent" });
   } catch (error) {
-    console.error(" FORGOT PASSWORD ERROR:", error);
-    res.status(500).json({ message: "Failed to send email. Check your internet connection." });
+    res.status(500).json({ message: "Error sending email" });
   }
 };
 
+// ==========================
+// RESET PASSWORD
+// ==========================
 export const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-    const { password } = req.body;
 
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpire: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+    if (!user) return res.status(400).json({ message: "Invalid token" });
 
-    user.password = await bcrypt.hash(password, 10);
+    user.password = await bcrypt.hash(req.body.password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+
     await user.save();
 
-    res.status(200).json({ message: "Password updated successfully" });
+    res.status(200).json({ message: "Password updated" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// ==========================================
-//  ADMIN: DASHBOARD CONTROLLERS
-// ==========================================
-
+// ==========================
+// ADMIN CONTROLLERS
+// ==========================
 export const getApprovedStudents = async (req, res) => {
-  try {
-    const students = await User.find({ role: "student", isApproved: true });
-    res.status(200).json({ success: true, students });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching approved students", error: error.message });
-  }
+  const students = await User.find({ role: "student", isApproved: true });
+  res.json({ students });
 };
 
 export const rejectUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.status(200).json({ success: true, message: "User removed successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error rejecting user", error: error.message });
-  }
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ message: "User deleted" });
 };
 
 export const getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select("-password -otp");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.status(200).json({ success: true, user });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching user details", error: error.message });
-  }
+  const user = await User.findById(req.params.id);
+  res.json({ user });
 };
 
 export const updateUser = async (req, res) => {
-  try {
-    const { name, email } = req.body;
-    const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email },
-      { new: true, runValidators: true }
-    ).select("-password");
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
-    res.status(200).json({ success: true, message: "User updated successfully", user: updatedUser });
-  } catch (error) {
-    res.status(500).json({ message: "Error updating user", error: error.message });
-  }
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true }
+  );
+  res.json({ user });
 };
