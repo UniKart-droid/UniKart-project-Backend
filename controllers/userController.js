@@ -9,18 +9,13 @@ import crypto from "crypto";
 // ==========================
 const getTransporter = () => {
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host: "smtp-relay.brevo.com",
     port: 587,
     secure: false,
     auth: {
       user: process.env.EMAIL,
       pass: process.env.EMAIL_PASS,
     },
-    tls: {
-      rejectUnauthorized: false
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
   });
 };
 
