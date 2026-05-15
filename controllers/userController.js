@@ -2,10 +2,10 @@ import User from "../model/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import * as Brevo from "@getbrevo/brevo";   // ✅ FIXED IMPORT
+import * as Brevo from "@getbrevo/brevo"; // FIXED
 
 // ==========================
-//  HELPER: SEND EMAIL
+// HELPER: SEND EMAIL
 // ==========================
 const sendEmail = async (to, subject, html) => {
   try {
@@ -16,19 +16,21 @@ const sendEmail = async (to, subject, html) => {
       process.env.BREVO_API_KEY
     );
 
-    await apiInstance.sendTransacEmail({
+    const sendSmtpEmail = {
       sender: { email: "rajputridhi92@gmail.com", name: "UniKart" },
       to: [{ email: to }],
-      subject: subject,
+      subject,
       htmlContent: html,
-    });
+    };
+
+    await apiInstance.sendTransacEmail(sendSmtpEmail);
   } catch (err) {
-    console.log("EMAIL ERROR:", err.message);
+    console.log("EMAIL ERROR:", err.response?.body || err.message);
   }
 };
 
 // ==========================
-//  SEND OTP CONTROLLER
+// SEND OTP CONTROLLER
 // ==========================
 export const sendOtp = async (req, res) => {
   try {
@@ -52,8 +54,8 @@ export const sendOtp = async (req, res) => {
     await sendEmail(
       email,
       "Your UniKart Verification Code",
-      `<div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2>UniKart Verification</h2>
+      `<div>
+        <h2>UniKart OTP</h2>
         <h1>${otp}</h1>
         <p>Valid for 5 minutes</p>
       </div>`
@@ -67,7 +69,7 @@ export const sendOtp = async (req, res) => {
 };
 
 // ==========================
-//  WELCOME EMAIL FUNCTION
+// WELCOME EMAIL
 // ==========================
 const sendWelcomeEmail = async (email, name) => {
   try {
@@ -85,7 +87,7 @@ const sendWelcomeEmail = async (email, name) => {
 };
 
 // ==========================
-//  SIGNUP CONTROLLER
+// SIGNUP
 // ==========================
 export const signupUser = async (req, res) => {
   try {
@@ -96,6 +98,7 @@ export const signupUser = async (req, res) => {
     }
 
     const userWithOtp = await User.findOne({ email });
+
     if (!userWithOtp || userWithOtp.otp !== otp || userWithOtp.otpExpire < Date.now()) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
@@ -117,10 +120,14 @@ export const signupUser = async (req, res) => {
     if (sel_role === "teacher") {
       if (!teacher_id) return res.status(400).json({ message: "Teacher ID is required" });
       updateFields.teacher_id = teacher_id;
-    } else if (sel_role === "admin") {
+    }
+
+    if (sel_role === "admin") {
       if (!admin_id) return res.status(400).json({ message: "Admin ID is required" });
       updateFields.admin_id = admin_id;
-    } else if (sel_role === "student") {
+    }
+
+    if (sel_role === "student") {
       if (!req.file) return res.status(400).json({ message: "ID Card is required" });
       updateFields.id_card = req.file.path.replace(/\\/g, "/");
     }
@@ -145,6 +152,7 @@ export const signupUser = async (req, res) => {
         isApproved: newUser.isApproved,
       },
     });
+
   } catch (error) {
     console.error("SIGNUP ERROR:", error);
     return res.status(500).json({ message: "Server error", error: error.message });
@@ -152,7 +160,7 @@ export const signupUser = async (req, res) => {
 };
 
 // ==========================
-// LOGIN CONTROLLER
+// LOGIN
 // ==========================
 export const loginUser = async (req, res) => {
   try {
@@ -179,6 +187,7 @@ export const loginUser = async (req, res) => {
       token,
       user: { id: user._id, name: user.name, role: user.role },
     });
+
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -209,6 +218,7 @@ export const forgotPassword = async (req, res) => {
     );
 
     res.status(200).json({ message: "Reset link sent" });
+
   } catch (error) {
     res.status(500).json({ message: "Error sending email" });
   }
@@ -235,6 +245,7 @@ export const resetPassword = async (req, res) => {
     await user.save();
 
     res.status(200).json({ message: "Password updated" });
+
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
